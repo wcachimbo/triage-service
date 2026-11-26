@@ -12,6 +12,8 @@ import com.vidacruz.triage.infraestructura.dto.RegistroRequest;
 import com.vidacruz.triage.infraestructura.dto.RegistroResponse;
 import com.vidacruz.triage.infraestructura.entity.Auditoria;
 import com.vidacruz.triage.infraestructura.entity.Paciente;
+import com.vidacruz.triage.infraestructura.kafka.EventoPaciente;
+import com.vidacruz.triage.infraestructura.kafka.PublicadorEventos;
 import com.vidacruz.triage.infraestructura.repository.AuditoriaRepository;
 import com.vidacruz.triage.infraestructura.repository.PacienteRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +31,7 @@ public class PacienteService {
 
     private final PacienteRepository repositorio;
     private final AuditoriaRepository auditoriaRepositorio;
+    private final PublicadorEventos publicador;
     private final Clasificador clasificador = new Clasificador();
     private final MaquinaEstados maquinaEstados = new MaquinaEstados();
 
@@ -41,6 +44,7 @@ public class PacienteService {
 
     public PacienteService(PacienteRepository repositorio,
                            AuditoriaRepository auditoriaRepositorio,
+                           PublicadorEventos publicador,
                            @Value("${triage.sla.critico}") int slaCritico,
                            @Value("${triage.sla.urgente}") int slaUrgente,
                            @Value("${triage.sla.urgente-2}") int slaUrgente2,
@@ -48,6 +52,7 @@ public class PacienteService {
                            @Value("${triage.sla.no-urgente-2}") int slaNoUrgente2) {
         this.repositorio = repositorio;
         this.auditoriaRepositorio = auditoriaRepositorio;
+        this.publicador = publicador;
         this.slaCritico = slaCritico;
         this.slaUrgente = slaUrgente;
         this.slaUrgente2 = slaUrgente2;
@@ -77,12 +82,10 @@ public class PacienteService {
                 nivel, sla, EstadoPaciente.REGISTRADO, false,
                 ahora, null, ahora);
 
-        // 4. Guardar el paciente y, en la misma transacción, su auditoría
+        // 4. Guardar, auditar y publicar el evento
         return repositorio.save(nuevo)
-                .flatMap(guardado -> auditoriaRepositorio
-                        .save(new Auditoria(null, guardado.id(), TipoEvento.PACIENTE_REGISTRADO,
-                                null, EstadoPaciente.REGISTRADO, ahora))
-                        .thenReturn(guardado))
+                .flatMap(guardado -> auditarYPublicar(guardado, TipoEvento.PACIENTE_REGISTRADO,
+                        null, EstadoPaciente.REGISTRADO, ahora))
                 .map(p -> new RegistroResponse(
                         p.id(), p.nivel(), p.slaMinutos(), p.estado(), p.fechaRegistro()));
     }
@@ -105,12 +108,10 @@ public class PacienteService {
                             ? TipoEvento.PACIENTE_EN_CONSULTA
                             : TipoEvento.PACIENTE_ALTA;
 
-                    // Guardar el nuevo estado y, en la misma transacción, la auditoría
+                    // Guardar el nuevo estado, auditar y publicar el evento
                     return repositorio.save(paciente.conEstado(nuevoEstado, ahora))
-                            .flatMap(guardado -> auditoriaRepositorio
-                                    .save(new Auditoria(null, guardado.id(), tipo,
-                                            paciente.estado(), nuevoEstado, ahora))
-                                    .thenReturn(guardado));
+                            .flatMap(guardado -> auditarYPublicar(guardado, tipo,
+                                    paciente.estado(), nuevoEstado, ahora));
                 })
                 .map(this::aRespuesta);
     }
@@ -124,6 +125,19 @@ public class PacienteService {
     }
 
     // ---------- Auxiliares ----------
+
+    // Guarda la fila de auditoría y publica el evento. Devuelve el mismo paciente.
+    private Mono<Paciente> auditarYPublicar(Paciente paciente, TipoEvento tipo,
+                                            EstadoPaciente anterior, EstadoPaciente nuevo,
+                                            OffsetDateTime ahora) {
+        Auditoria fila = new Auditoria(null, paciente.id(), tipo, anterior, nuevo, ahora);
+        EventoPaciente evento = new EventoPaciente(
+                tipo.nombreKafka(), paciente.id(), paciente.nivel(), anterior, nuevo, ahora);
+
+        return auditoriaRepositorio.save(fila)
+                .then(publicador.publicar(evento))
+                .thenReturn(paciente);
+    }
 
     private PacienteResponse aRespuesta(Paciente p) {
         long segundos = Duration.between(p.fechaEstadoActual(), OffsetDateTime.now(ZoneOffset.UTC))
