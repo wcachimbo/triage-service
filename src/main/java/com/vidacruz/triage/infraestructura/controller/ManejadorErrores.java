@@ -1,6 +1,7 @@
 package com.vidacruz.triage.infraestructura.controller;
 
 import com.vidacruz.triage.domain.exceptions.PacienteNoEncontradoException;
+import com.vidacruz.triage.domain.exceptions.TransicionInvalidaException;
 import com.vidacruz.triage.infraestructura.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,5 +39,12 @@ public class ManejadorErrores {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse noEncontrado(PacienteNoEncontradoException ex) {
         return new ErrorResponse(404, "No encontrado", List.of(ex.getMessage()));
+    }
+
+    // 409: el cambio de estado no está permitido
+    @ExceptionHandler(TransicionInvalidaException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse transicionInvalida(TransicionInvalidaException ex) {
+        return new ErrorResponse(409, "Conflicto", List.of(ex.getMessage()));
     }
 }

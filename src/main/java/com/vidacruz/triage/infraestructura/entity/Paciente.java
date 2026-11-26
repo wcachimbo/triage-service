@@ -28,4 +28,12 @@ public record Paciente(
         OffsetDateTime fechaRegistro,
         OffsetDateTime fechaEscalado,
         OffsetDateTime fechaEstadoActual) {
+    // Devuelve una copia del paciente con el nuevo estado
+    public Paciente conEstado(EstadoPaciente nuevoEstado, OffsetDateTime ahora) {
+        return new Paciente(
+                id, nombre, edad, frecuenciaCardiaca, presionSistolica, presionDiastolica,
+                spo2, temperatura, dolor, gcs, quejaPrincipal, nivel, slaMinutos,
+                nuevoEstado, escalado, fechaRegistro, fechaEscalado, ahora);
+    }
+
 }
