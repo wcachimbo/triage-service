@@ -3,6 +3,8 @@ package com.vidacruz.triage.application;
 import com.vidacruz.triage.domain.Clasificador;
 import com.vidacruz.triage.domain.enums.EstadoPaciente;
 import com.vidacruz.triage.domain.enums.NivelTriage;
+import com.vidacruz.triage.domain.exceptions.PacienteNoEncontradoException;
+import com.vidacruz.triage.infraestructura.dto.PacienteResponse;
 import com.vidacruz.triage.infraestructura.dto.RegistroRequest;
 import com.vidacruz.triage.infraestructura.dto.RegistroResponse;
 import com.vidacruz.triage.infraestructura.entity.Paciente;
@@ -11,8 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 
 @Service
 public class PacienteService {
@@ -64,6 +68,25 @@ public class PacienteService {
         return repositorio.save(nuevo)
                 .map(p -> new RegistroResponse(
                         p.id(), p.nivel(), p.slaMinutos(), p.estado(), p.fechaRegistro()));
+    }
+
+    public Mono<PacienteResponse> obtener(UUID id) {
+        return repositorio.findById(id)
+                .switchIfEmpty(Mono.error(new PacienteNoEncontradoException(id)))
+                .map(this::aRespuesta);
+    }
+
+    private PacienteResponse aRespuesta(Paciente p) {
+        long segundos = Duration.between(p.fechaEstadoActual(), OffsetDateTime.now(ZoneOffset.UTC))
+                .getSeconds();
+
+        return new PacienteResponse(
+                p.id(), p.nombre(), p.edad(), p.frecuenciaCardiaca(),
+                p.presionSistolica(), p.presionDiastolica(), p.spo2(),
+                p.temperatura(), p.dolor(), p.gcs(), p.quejaPrincipal(),
+                p.nivel(), p.slaMinutos(), p.estado(), p.escalado(),
+                p.fechaRegistro(), p.fechaEscalado(), p.fechaEstadoActual(),
+                segundos);
     }
 
     private int slaPara(NivelTriage nivel) {
