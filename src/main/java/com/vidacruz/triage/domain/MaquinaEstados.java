@@ -1,4 +1,4 @@
-package com.vidacruz.triage;
+package com.vidacruz.triage.domain;
 
 import com.vidacruz.triage.domain.enums.EstadoPaciente;
 

@@ -1,6 +1,5 @@
 package com.vidacruz.triage.domain;
 
-import com.vidacruz.triage.MaquinaEstados;
 import com.vidacruz.triage.domain.enums.EstadoPaciente;
 import org.junit.jupiter.api.Test;
 
