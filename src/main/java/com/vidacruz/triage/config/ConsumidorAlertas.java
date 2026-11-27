@@ -66,7 +66,6 @@ public class ConsumidorAlertas {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        // Grupo nuevo: empezar desde ahora, para no alertar escalamientos viejos
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
         ReceiverOptions<String, String> opciones = ReceiverOptions.<String, String>create(props)
@@ -90,7 +89,6 @@ public class ConsumidorAlertas {
                 .map(evento -> new AlertaEscalamiento(evento.pacienteId(), evento.nivel(), evento.timestamp()))
                 .flatMap(notificador::alertar)
                 .onErrorResume(error -> {
-                    // Un mensaje dañado no debe detener el consumo de los demás
                     log.error("No se pudo procesar el mensaje de Kafka", error);
                     return Mono.empty();
                 })

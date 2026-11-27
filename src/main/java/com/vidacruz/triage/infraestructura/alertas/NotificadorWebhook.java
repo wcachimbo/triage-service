@@ -45,7 +45,6 @@ public class NotificadorWebhook implements Notificador {
                 .retryWhen(Retry.backoff(2, Duration.ofSeconds(1)))
                 .doOnSuccess(r -> log.info("Alerta enviada al webhook para el paciente {}", alerta.pacienteId()))
                 .onErrorResume(error -> {
-                    // Si el webhook falla, no tumbamos nada: ya quedó en el log
                     log.error("No se pudo enviar la alerta al webhook para el paciente {}",
                             alerta.pacienteId(), error);
                     return Mono.empty();
