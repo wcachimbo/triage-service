@@ -41,7 +41,6 @@ public class EscalamientoService {
     public Mono<Long> evaluar() {
         return repositorio.buscarVencidos()
                 .concatMap(paciente -> escalar(paciente)
-                        // Si falla uno, se registra y se sigue con los demás
                         .onErrorResume(error -> {
                             log.error("No se pudo escalar al paciente {}", paciente.id(), error);
                             return Mono.just(false);
@@ -57,7 +56,6 @@ public class EscalamientoService {
                 .flatMap(cambio -> {
                     OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
 
-                    // El estado no cambia (sigue REGISTRADO): lo que cambia es el flag
                     Auditoria fila = new Auditoria(null, paciente.id(), TipoEvento.PACIENTE_ESCALADO,
                             EstadoPaciente.REGISTRADO, EstadoPaciente.REGISTRADO, ahora);
                     EventoPaciente evento = new EventoPaciente(
@@ -70,7 +68,6 @@ public class EscalamientoService {
                 })
                 .defaultIfEmpty(false);
 
-        // Todo o nada: marcar + auditar + publicar en una sola transacción
         return transaccion.transactional(pasos);
     }
 }

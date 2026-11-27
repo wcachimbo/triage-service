@@ -35,7 +35,6 @@ public class PacienteService {
     private final Clasificador clasificador = new Clasificador();
     private final MaquinaEstados maquinaEstados = new MaquinaEstados();
 
-    // Los minutos de SLA vienen de application.properties
     private final int slaCritico;
     private final int slaUrgente;
     private final int slaUrgente2;
@@ -73,7 +72,7 @@ public class PacienteService {
         // 2. SLA según el nivel
         int sla = slaPara(nivel);
 
-        // 3. Armar el paciente (id null: lo genera la base de datos)
+        // 3. Armar el paciente
         OffsetDateTime ahora = OffsetDateTime.now(ZoneOffset.UTC);
         Paciente nuevo = new Paciente(
                 null, req.nombre(), req.edad(), req.frecuenciaCardiaca(),
@@ -98,7 +97,6 @@ public class PacienteService {
                 .switchIfEmpty(Mono.error(new PacienteNoEncontradoException(id)))
                 .flatMap(paciente -> {
 
-                    // ¿Se puede pasar de este estado al nuevo?
                     if (!maquinaEstados.esValida(paciente.estado(), nuevoEstado)) {
                         return Mono.error(new TransicionInvalidaException(paciente.estado(), nuevoEstado));
                     }
@@ -108,7 +106,6 @@ public class PacienteService {
                             ? TipoEvento.PACIENTE_EN_CONSULTA
                             : TipoEvento.PACIENTE_ALTA;
 
-                    // Guardar el nuevo estado, auditar y publicar el evento
                     return repositorio.save(paciente.conEstado(nuevoEstado, ahora))
                             .flatMap(guardado -> auditarYPublicar(guardado, tipo,
                                     paciente.estado(), nuevoEstado, ahora));

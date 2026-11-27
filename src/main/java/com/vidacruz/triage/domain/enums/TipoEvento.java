@@ -8,7 +8,6 @@ public enum TipoEvento {
     PACIENTE_ESCALADO,
     PACIENTE_ALTA;
 
-    // Nombre del evento tal como se publica en Kafka
     public String nombreKafka() {
         return name().toLowerCase(Locale.ROOT);
     }
