@@ -1,6 +1,7 @@
 package com.vidacruz.triage.infraestructura.controller;
 
 import com.vidacruz.triage.domain.exceptions.PacienteNoEncontradoException;
+import com.vidacruz.triage.domain.exceptions.ReporteInvalidoException;
 import com.vidacruz.triage.domain.exceptions.TransicionInvalidaException;
 import com.vidacruz.triage.infraestructura.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
@@ -46,5 +47,12 @@ public class ManejadorErrores {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse transicionInvalida(TransicionInvalidaException ex) {
         return new ErrorResponse(409, "Conflicto", List.of(ex.getMessage()));
+    }
+
+    // 400: parámetros del reporte inválidos (rango al revés o demasiado grande)
+    @ExceptionHandler(ReporteInvalidoException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse reporteInvalido(ReporteInvalidoException ex) {
+        return new ErrorResponse(400, "Parámetros inválidos", List.of(ex.getMessage()));
     }
 }
