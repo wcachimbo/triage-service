@@ -8,6 +8,7 @@ import com.vidacruz.triage.infraestructura.entity.Paciente;
 import com.vidacruz.triage.infraestructura.kafka.PublicadorEventos;
 import com.vidacruz.triage.infraestructura.repository.AuditoriaRepository;
 import com.vidacruz.triage.infraestructura.repository.PacienteRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.reactive.TransactionalOperator;
@@ -19,6 +20,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -33,6 +35,7 @@ class EscalamientoServiceTest {
     private final AuditoriaRepository auditoria = mock(AuditoriaRepository.class);
     private final PublicadorEventos publicador = mock(PublicadorEventos.class);
     private final TransactionalOperator transaccion = mock(TransactionalOperator.class);
+    private final SimpleMeterRegistry metricas = new SimpleMeterRegistry();
 
     private EscalamientoService servicio;
 
@@ -44,7 +47,7 @@ class EscalamientoServiceTest {
         when(auditoria.save(any(Auditoria.class)))
                 .thenAnswer(invocacion -> Mono.just(invocacion.getArgument(0)));
 
-        servicio = new EscalamientoService(repositorio, auditoria, publicador, transaccion);
+        servicio = new EscalamientoService(repositorio, auditoria, publicador, transaccion,metricas);
     }
 
     private static Paciente pacienteVencido() {
@@ -56,6 +59,8 @@ class EscalamientoServiceTest {
 
     @Test
     void cuandoElUpdateCambiaUnaFila_auditaYPublicaUnaVez() {
+
+        assertEquals(1.0, metricas.counter("triage.escalamientos", "nivel", "URGENTE").count());
         Paciente paciente = pacienteVencido();
         when(repositorio.buscarVencidos()).thenReturn(Flux.just(paciente));
         when(repositorio.marcarEscalado(paciente.id())).thenReturn(Mono.just(1));

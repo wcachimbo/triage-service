@@ -6,7 +6,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -33,6 +35,8 @@ public class ProcesoEscalamiento {
                     log.error("Falló el ciclo de escalamiento", error);
                     return Mono.empty();
                 })
+                .contextWrite(Context.of("correlationId", "escalamiento-" + UUID.randomUUID()))
                 .then();
+
     }
 }
