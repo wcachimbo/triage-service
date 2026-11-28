@@ -8,6 +8,7 @@ import com.vidacruz.triage.infraestructura.kafka.EventoPaciente;
 import com.vidacruz.triage.infraestructura.kafka.PublicadorEventos;
 import com.vidacruz.triage.infraestructura.repository.AuditoriaRepository;
 import com.vidacruz.triage.infraestructura.repository.PacienteRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,21 +27,30 @@ public class EscalamientoService {
     private final AuditoriaRepository auditoriaRepositorio;
     private final PublicadorEventos publicador;
     private final TransactionalOperator transaccion;
+    private final MeterRegistry metricas;
 
     public EscalamientoService(PacienteRepository repositorio,
                                AuditoriaRepository auditoriaRepositorio,
                                PublicadorEventos publicador,
-                               TransactionalOperator transaccion) {
+                               TransactionalOperator transaccion, MeterRegistry metricas) {
         this.repositorio = repositorio;
         this.auditoriaRepositorio = auditoriaRepositorio;
         this.publicador = publicador;
         this.transaccion = transaccion;
+        this.metricas = metricas;
     }
 
     // Un ciclo completo: devuelve cuántos pacientes se escalaron
     public Mono<Long> evaluar() {
         return repositorio.buscarVencidos()
                 .concatMap(paciente -> escalar(paciente)
+                        // Se cuenta después de la transacción, y solo si de verdad se escaló
+                        .doOnNext(escalado -> {
+                            if (escalado) {
+                                metricas.counter("triage.escalamientos", "nivel", paciente.nivel().name())
+                                        .increment();
+                            }
+                        })
                         .onErrorResume(error -> {
                             log.error("No se pudo escalar al paciente {}", paciente.id(), error);
                             return Mono.just(false);

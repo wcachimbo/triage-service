@@ -16,6 +16,7 @@ import com.vidacruz.triage.infraestructura.kafka.EventoPaciente;
 import com.vidacruz.triage.infraestructura.kafka.PublicadorEventos;
 import com.vidacruz.triage.infraestructura.repository.AuditoriaRepository;
 import com.vidacruz.triage.infraestructura.repository.PacienteRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class PacienteService {
     private final PublicadorEventos publicador;
     private final Clasificador clasificador = new Clasificador();
     private final MaquinaEstados maquinaEstados = new MaquinaEstados();
+    private final MeterRegistry metricas;
 
     private final int slaCritico;
     private final int slaUrgente;
@@ -43,7 +45,7 @@ public class PacienteService {
 
     public PacienteService(PacienteRepository repositorio,
                            AuditoriaRepository auditoriaRepositorio,
-                           PublicadorEventos publicador,
+                           PublicadorEventos publicador, MeterRegistry metricas,
                            @Value("${triage.sla.critico}") int slaCritico,
                            @Value("${triage.sla.urgente}") int slaUrgente,
                            @Value("${triage.sla.urgente-2}") int slaUrgente2,
@@ -52,6 +54,7 @@ public class PacienteService {
         this.repositorio = repositorio;
         this.auditoriaRepositorio = auditoriaRepositorio;
         this.publicador = publicador;
+        this.metricas = metricas;
         this.slaCritico = slaCritico;
         this.slaUrgente = slaUrgente;
         this.slaUrgente2 = slaUrgente2;
@@ -86,7 +89,8 @@ public class PacienteService {
                 .flatMap(guardado -> auditarYPublicar(guardado, TipoEvento.PACIENTE_REGISTRADO,
                         null, EstadoPaciente.REGISTRADO, ahora))
                 .map(p -> new RegistroResponse(
-                        p.id(), p.nivel(), p.slaMinutos(), p.estado(), p.fechaRegistro()));
+                        p.id(), p.nivel(), p.slaMinutos(), p.estado(), p.fechaRegistro()))
+                .doOnNext(p -> metricas.counter("triage.clasificaciones", "nivel", p.nivel().name()).increment());
     }
 
     // ---------- PATCH: cambiar estado ----------
